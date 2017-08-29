@@ -97,7 +97,7 @@ func TestResolveAll(t *testing.T) {
 	}
 	h := &DefaultMissingPackageHandler{Missing: []string{}, Gopath: []string{}, Prefix: "../vendor"}
 	r.Handler = h
-	l, err := r.ResolveAll(deps, false)
+	l, err := r.ResolveAll(deps, false, false)
 	if err != nil {
 		t.Fatalf("Failed to resolve: %s", err)
 	}

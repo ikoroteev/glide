@@ -111,7 +111,7 @@ type VersionHandler interface {
 
 	// SetVersion sets the version for a package. An error is returned if there
 	// was a problem setting the version.
-	SetVersion(pkg string, testDep bool) error
+	SetVersion(pkg string, testDep bool, stableOnly bool) error
 }
 
 // DefaultVersionHandler is the default handler for setting the version.
@@ -128,7 +128,7 @@ func (d *DefaultVersionHandler) Process(pkg string) error {
 
 // SetVersion here sends a message when a package is found noting that it
 // did not set the version.
-func (d *DefaultVersionHandler) SetVersion(pkg string, testDep bool) error {
+func (d *DefaultVersionHandler) SetVersion(pkg string, testDep, stableOnly bool) error {
 	msg.Warn("Version not set for package %s", pkg)
 	return nil
 }
@@ -238,9 +238,9 @@ func (r *Resolver) Resolve(pkg, basepath string) ([]string, error) {
 
 	// In this mode, walk the entire tree.
 	if r.ResolveAllFiles {
-		return r.resolveList(l, false, false)
+		return r.resolveList(l, false, false, false)
 	}
-	return r.resolveImports(l, false, false)
+	return r.resolveImports(l, false, false, false)
 }
 
 // dirHasPrefix tests whether the directory dir begins with prefix.
@@ -372,18 +372,18 @@ func (r *Resolver) ResolveLocal(deep bool) ([]string, []string, error) {
 
 	if deep {
 		if r.ResolveAllFiles {
-			re, err := r.resolveList(l, false, false)
+			re, err := r.resolveList(l, false, false, false)
 			if err != nil {
 				return []string{}, []string{}, err
 			}
-			tre, err := r.resolveList(l, false, true)
+			tre, err := r.resolveList(l, false, true, false)
 			return re, tre, err
 		}
-		re, err := r.resolveImports(l, false, false)
+		re, err := r.resolveImports(l, false, false, false)
 		if err != nil {
 			return []string{}, []string{}, err
 		}
-		tre, err := r.resolveImports(tl, true, true)
+		tre, err := r.resolveImports(tl, true, true, false)
 		return re, tre, err
 	}
 
@@ -415,14 +415,14 @@ func (r *Resolver) ResolveLocal(deep bool) ([]string, []string, error) {
 //
 // If one of the passed in packages does not exist in the vendor directory,
 // an error is returned.
-func (r *Resolver) ResolveAll(deps []*cfg.Dependency, addTest bool) ([]string, error) {
+func (r *Resolver) ResolveAll(deps []*cfg.Dependency, addTest, stableOnly bool) ([]string, error) {
 
 	queue := sliceToQueue(deps, r.VendorDir)
 
 	if r.ResolveAllFiles {
-		return r.resolveList(queue, false, addTest)
+		return r.resolveList(queue, false, addTest, stableOnly)
 	}
-	return r.resolveImports(queue, false, addTest)
+	return r.resolveImports(queue, false, addTest, stableOnly)
 }
 
 // Stripv strips the vendor/ prefix from vendored packages.
@@ -452,7 +452,7 @@ func (r *Resolver) vpath(str string) string {
 // specifies if the dependencies should be added to the Config.DevImports. This
 // is important because we may resolve normal dependencies of test deps and add
 // them to the DevImports list.
-func (r *Resolver) resolveImports(queue *list.List, testDeps, addTest bool) ([]string, error) {
+func (r *Resolver) resolveImports(queue *list.List, testDeps, addTest, stableOnly bool) ([]string, error) {
 	msg.Debug("Resolving import path")
 
 	// When test deps passed in but not resolving return empty.
@@ -530,7 +530,7 @@ func (r *Resolver) resolveImports(queue *list.List, testDeps, addTest bool) ([]s
 					// By adding to the queue it will get reprocessed now that
 					// it exists.
 					queue.PushBack(r.vpath(dep))
-					r.VersionHandler.SetVersion(dep, addTest)
+					r.VersionHandler.SetVersion(dep, addTest, stableOnly)
 				} else if err2 != nil {
 					r.hadError[dep] = true
 					msg.Err("Error looking for %s: %s", dep, err2)
@@ -583,7 +583,7 @@ func (r *Resolver) resolveImports(queue *list.List, testDeps, addTest bool) ([]s
 					r.alreadyQ[imp] = true
 					queue.PushBack(r.vpath(imp))
 					if err := r.Handler.InVendor(imp, addTest); err == nil {
-						r.VersionHandler.SetVersion(imp, addTest)
+						r.VersionHandler.SetVersion(imp, addTest, stableOnly)
 					} else {
 						msg.Warn("Error updating %s: %s", imp, err)
 					}
@@ -593,7 +593,7 @@ func (r *Resolver) resolveImports(queue *list.List, testDeps, addTest bool) ([]s
 				if ok, err := r.Handler.NotFound(imp, addTest); ok {
 					r.alreadyQ[imp] = true
 					queue.PushBack(r.vpath(imp))
-					r.VersionHandler.SetVersion(imp, addTest)
+					r.VersionHandler.SetVersion(imp, addTest, stableOnly)
 				} else if err != nil {
 					r.hadError[imp] = true
 					msg.Err("Error looking for %s: %s", imp, err)
@@ -608,7 +608,7 @@ func (r *Resolver) resolveImports(queue *list.List, testDeps, addTest bool) ([]s
 					if ok, _ := r.Handler.OnGopath(imp, addTest); ok {
 						r.alreadyQ[imp] = true
 						queue.PushBack(r.vpath(imp))
-						r.VersionHandler.SetVersion(imp, addTest)
+						r.VersionHandler.SetVersion(imp, addTest, stableOnly)
 					}
 				}
 			}
@@ -673,7 +673,7 @@ func (r *Resolver) resolveImports(queue *list.List, testDeps, addTest bool) ([]s
 // This walks the entire file tree for the given dependencies, not just the
 // parts that are imported directly. Using this will discover dependencies
 // regardless of OS, and arch.
-func (r *Resolver) resolveList(queue *list.List, testDeps, addTest bool) ([]string, error) {
+func (r *Resolver) resolveList(queue *list.List, testDeps, addTest, stableOnly bool) ([]string, error) {
 	// When test deps passed in but not resolving return empty.
 	if testDeps && !r.ResolveTest {
 		return []string{}, nil
@@ -714,7 +714,7 @@ func (r *Resolver) resolveList(queue *list.List, testDeps, addTest bool) ([]stri
 			// Anything that comes through here has already been through
 			// the queue.
 			r.alreadyQ[path] = true
-			e := r.queueUnseen(path, queue, testDeps, addTest)
+			e := r.queueUnseen(path, queue, testDeps, addTest, stableOnly)
 			if e != nil {
 				failedDepPath = path
 				//msg.Err("Failed to fetch dependency %s: %s", path, err)
@@ -769,7 +769,7 @@ func (r *Resolver) resolveList(queue *list.List, testDeps, addTest bool) ([]stri
 
 // queueUnseenImports scans a package's imports and adds any new ones to the
 // processing queue.
-func (r *Resolver) queueUnseen(pkg string, queue *list.List, testDeps, addTest bool) error {
+func (r *Resolver) queueUnseen(pkg string, queue *list.List, testDeps, addTest, stableOnly bool) error {
 	// A pkg is marked "seen" as soon as we have inspected it the first time.
 	// Seen means that we have added all of its imports to the list.
 
@@ -777,7 +777,7 @@ func (r *Resolver) queueUnseen(pkg string, queue *list.List, testDeps, addTest b
 	// or intentionally not put it in the queue for fatal reasons (e.g. no
 	// buildable source).
 
-	deps, err := r.imports(pkg, testDeps, addTest)
+	deps, err := r.imports(pkg, testDeps, addTest, stableOnly)
 	if err != nil && !strings.HasPrefix(err.Error(), "no buildable Go source") {
 		msg.Err("Could not find %s: %s", pkg, err)
 		return err
@@ -802,7 +802,7 @@ func (r *Resolver) queueUnseen(pkg string, queue *list.List, testDeps, addTest b
 // If the package is in GOROOT, this will return an empty list (but not
 // an error).
 // If it cannot resolve the pkg, it will return an error.
-func (r *Resolver) imports(pkg string, testDeps, addTest bool) ([]string, error) {
+func (r *Resolver) imports(pkg string, testDeps, addTest, stableOnly bool) ([]string, error) {
 
 	if r.Config.HasIgnore(pkg) {
 		msg.Debug("Ignoring %s", pkg)
@@ -871,7 +871,7 @@ func (r *Resolver) imports(pkg string, testDeps, addTest bool) ([]string, error)
 			}
 			if found {
 				buf = append(buf, filepath.Join(r.VendorDir, filepath.FromSlash(imp)))
-				r.VersionHandler.SetVersion(imp, addTest)
+				r.VersionHandler.SetVersion(imp, addTest, stableOnly)
 				continue
 			}
 			r.seen[info.Path] = true
@@ -879,7 +879,7 @@ func (r *Resolver) imports(pkg string, testDeps, addTest bool) ([]string, error)
 			//msg.Debug("Vendored: %s", imp)
 			buf = append(buf, info.Path)
 			if err := r.Handler.InVendor(imp, addTest); err == nil {
-				r.VersionHandler.SetVersion(imp, addTest)
+				r.VersionHandler.SetVersion(imp, addTest, stableOnly)
 			} else {
 				msg.Warn("Error updating %s: %s", imp, err)
 			}
@@ -893,7 +893,7 @@ func (r *Resolver) imports(pkg string, testDeps, addTest bool) ([]string, error)
 			// in a less-than-perfect, but functional, situation.
 			if found {
 				buf = append(buf, filepath.Join(r.VendorDir, filepath.FromSlash(imp)))
-				r.VersionHandler.SetVersion(imp, addTest)
+				r.VersionHandler.SetVersion(imp, addTest, stableOnly)
 				continue
 			}
 			msg.Warn("Package %s is on GOPATH, but not vendored. Ignoring.", imp)

@@ -43,6 +43,9 @@ type Installer struct {
 	// ResolveTest sets if test dependencies should be resolved.
 	ResolveTest bool
 
+	// Exclude prerelease version of packages
+	StableOnly bool
+
 	// Updated tracks the packages that have been remotely fetched.
 	Updated *UpdateTracker
 }
@@ -141,6 +144,7 @@ func (i *Installer) Update(conf *cfg.Config) error {
 		Config:  conf,
 		Use:     ic,
 		updated: i.Updated,
+		stableOnly: i.StableOnly,
 	}
 
 	v := &VersionHandler{
@@ -543,7 +547,7 @@ func allPackages(deps []*cfg.Dependency, res *dependency.Resolver, addTest bool)
 		return []string{}, err
 	}
 	vdir += string(os.PathSeparator)
-	ll, err := res.ResolveAll(deps, addTest)
+	ll, err := res.ResolveAll(deps, addTest, false)
 	if err != nil {
 		return []string{}, err
 	}
@@ -565,6 +569,7 @@ type MissingPackageHandler struct {
 	Config  *cfg.Config
 	Use     *importCache
 	updated *UpdateTracker
+	stableOnly bool
 }
 
 // NotFound attempts to retrieve a package when not found in the local cache
@@ -716,7 +721,7 @@ func (d *VersionHandler) Process(pkg string) (e error) {
 // - keeping the already set version
 // - proviting messaging about the version conflict
 // TODO(mattfarina): The way version setting happens can be improved. Currently not optimal.
-func (d *VersionHandler) SetVersion(pkg string, addTest bool) (e error) {
+func (d *VersionHandler) SetVersion(pkg string, addTest bool, stableOnly bool) (e error) {
 	root := util.GetRootFromPackage(pkg)
 
 	// Skip any references to the root package.
@@ -780,7 +785,7 @@ func (d *VersionHandler) SetVersion(pkg string, addTest bool) (e error) {
 		}
 	}
 
-	err := VcsVersion(dep)
+	err := VcsVersion(dep, stableOnly)
 	if err != nil {
 		msg.Warn("Unable to set version on %s to %s. Err: %s", root, dep.Reference, err)
 		e = err

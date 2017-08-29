@@ -146,7 +146,7 @@ func VcsUpdate(dep *cfg.Dependency, force bool, updated *UpdateTracker) error {
 }
 
 // VcsVersion set the VCS version for a checkout.
-func VcsVersion(dep *cfg.Dependency) error {
+func VcsVersion(dep *cfg.Dependency, stableOnly bool) error {
 
 	// If the dependency has already been pinned we can skip it. This is a
 	// faster path so we don't need to resolve it again.
@@ -225,6 +225,9 @@ func VcsVersion(dep *cfg.Dependency) error {
 		found := false
 		for _, v := range semvers {
 			if constraint.Check(v) {
+				if stableOnly && v.Prerelease() != "" {
+					continue
+				}
 				found = true
 				// If the constrint passes get the original reference
 				ver = v.Original()

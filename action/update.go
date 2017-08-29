@@ -27,7 +27,7 @@ func Update(installer *repo.Installer, skipRecursive, stripVendor bool) {
 
 	// Set the versions for the initial dependencies so that resolved dependencies
 	// are rooted in the correct version of the base.
-	if err := repo.SetReference(conf, installer.ResolveTest); err != nil {
+	if err := repo.SetReference(conf, installer.ResolveTest, installer.StableOnly); err != nil {
 		msg.Die("Failed to set initial config references: %s", err)
 	}
 
@@ -46,7 +46,7 @@ func Update(installer *repo.Installer, skipRecursive, stripVendor bool) {
 		// installer set them as it went to make sure it parsed the right imports
 		// from the right version of the package.
 		msg.Info("Setting references for remaining imports")
-		if err := repo.SetReference(confcopy, installer.ResolveTest); err != nil {
+		if err := repo.SetReference(confcopy, installer.ResolveTest, installer.StableOnly); err != nil {
 			msg.Err("Failed to set references: %s (Skip to cleanup)", err)
 		}
 	}

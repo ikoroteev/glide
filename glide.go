@@ -206,6 +206,10 @@ func commands() []cli.Command {
 					Usage: "This will resolve all dependencies for all packages, not just those directly used.",
 				},
 				cli.BoolFlag{
+					Name: "stable-only",
+					Usage: "Get only stable versions of packages with specified semantic versions.",
+				},
+				cli.BoolFlag{
 					Name:   "update-vendored, u",
 					Usage:  "Update vendored packages (without local VCS repo). Warning, changes will be lost.",
 					Hidden: true,
@@ -284,6 +288,8 @@ func commands() []cli.Command {
 				inst.Force = c.Bool("force")
 				inst.ResolveAllFiles = c.Bool("all-dependencies")
 				inst.ResolveTest = !c.Bool("skip-test")
+				inst.StableOnly = c.Bool("stable-only")
+
 				packages := []string(c.Args())
 				insecure := c.Bool("insecure")
 				action.Get(packages, inst, insecure, c.Bool("no-recursive"), c.Bool("strip-vendor"), c.Bool("non-interactive"), c.Bool("test"))
@@ -450,6 +456,10 @@ Example:
 					Usage:  "Update vendored packages (without local VCS repo). Warning: this may destroy local modifications to vendor/.",
 					Hidden: true,
 				},
+				cli.BoolFlag{
+					Name: "stable-only",
+					Usage: "Get only stable versions of packages with specified semantic versions." ,
+				},
 				cli.StringFlag{
 					Name:   "file, f",
 					Usage:  "Save all of the discovered dependencies to a Glide YAML file. (DEPRECATED: This has no impact.)",
@@ -511,6 +521,7 @@ Example:
 				installer.Force = c.Bool("force")
 				installer.Home = c.GlobalString("home")
 				installer.ResolveTest = !c.Bool("skip-test")
+				installer.StableOnly = c.Bool("stable-only")
 
 				action.Install(installer, c.Bool("strip-vendor"))
 				return nil
@@ -558,6 +569,10 @@ Example:
 				cli.BoolFlag{
 					Name:  "all-dependencies",
 					Usage: "This will resolve all dependencies for all packages, not just those directly used.",
+				},
+				cli.BoolFlag{
+					Name: "stable-only",
+					Usage: "Get only stable versions of packages with specified semantic versions.",
 				},
 				cli.BoolFlag{
 					Name:   "update-vendored, u",
@@ -635,6 +650,7 @@ Example:
 				installer.ResolveAllFiles = c.Bool("all-dependencies")
 				installer.Home = c.GlobalString("home")
 				installer.ResolveTest = !c.Bool("skip-test")
+				installer.StableOnly = c.Bool("stable-only")
 
 				action.Update(installer, c.Bool("no-recursive"), c.Bool("strip-vendor"))
 

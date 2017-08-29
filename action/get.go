@@ -66,7 +66,7 @@ func Get(names []string, installer *repo.Installer, insecure, skipRecursive, str
 	}
 
 	// Set Reference
-	if err := repo.SetReference(confcopy, installer.ResolveTest); err != nil {
+	if err := repo.SetReference(confcopy, installer.ResolveTest, installer.StableOnly); err != nil {
 		msg.Err("Failed to set references: %s", err)
 	}
 
